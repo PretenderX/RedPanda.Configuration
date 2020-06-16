@@ -36,6 +36,8 @@ param (
 	[string]$ZipOutputFileName
 )
 
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+
 if($BuildTarget -eq '')
 {
 	$foundBuildFiles = Get-ChildItem -Include *.sln,*.csproj -Recurse -Name -Force -Depth 1 | select -index 0
@@ -156,6 +158,11 @@ Invoke-Expression ('{0} restore "{1}" -Verbosity Detailed -NonInteractive' -f $N
 
 msbuild $BuildTarget /m /nologo /nr:false /p:DeployOnBuild=true /p:WebPublishMethod=Package /p:PackageAsSingleFile=true /p:SkipInvalidConfigurations=true /p:PackageLocation="$OutputFolder" /p:platform=$Platform /p:configuration=$Configuration
 
+if($LastExitCode -ne 0)
+{
+	exit $LastExitCode
+}
+
 if($ZipOutput.IsPresent -or $ZipOutputFileName -ne '')
 {
 	if($ZipOutputFileName -eq '')
@@ -163,7 +170,14 @@ if($ZipOutput.IsPresent -or $ZipOutputFileName -ne '')
 		$ZipOutputFileName = './{0}.zip' -f (Get-Item $BuildTarget | Select-Object -ExpandProperty BaseName)
 	}
 	
+	if(Test-Path -Path $ZipOutputFileName)
+	{
+		Remove-Item $ZipOutputFileName -Force
+	}
+	
 	Compress-Archive -Path $OutputFolder/* -DestinationPath $ZipOutputFileName -Force
 	
 	write-host ('Ñ¹Ëõ°üÂ·¾¶: {0}' -f (Resolve-Path $ZipOutputFileName))
 }
+
+exit 0
